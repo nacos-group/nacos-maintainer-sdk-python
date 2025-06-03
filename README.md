@@ -1,2 +1,2 @@
-# nacos-mcp-sdk-python
-Nacos Mcp Sdk for Python
+# nacos-ai-sdk-python
+Nacos AI Sdk for Python
