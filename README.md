@@ -1,2 +1,2 @@
-# nacos-ai-sdk-python
-Nacos AI Sdk for Python
+# nacos-maintainer-sdk-python
+Nacos Maintainer Sdk for Python
