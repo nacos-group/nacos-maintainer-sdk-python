@@ -99,6 +99,8 @@ class ClientHttpProxy:
 		retry_count = 3
 		nacos_exception = None
 		result_code = 200
+		error_msg = None
+		url = None
 		while get_current_time_millis() < end_time and retry_count>0:
 			try:
 				url = self.get_next_server() + http_reqeust.path
@@ -123,7 +125,7 @@ class ClientHttpProxy:
 
 		if nacos_exception:
 			raise nacos_exception
-		raise NacosException(SERVER_ERROR, f"request error,request:{http_reqeust}")
+		raise NacosException(SERVER_ERROR, f"request error,url:{url},method:{http_reqeust.method},result_code:{result_code},error_msg:{error_msg}")
 
 
 
