@@ -9,7 +9,7 @@ def read_requirements():
 
 setup(
     name='nacos-maintainer-sdk-python',
-    version='0.1.1',  # 项目的版本号
+    version='0.1.2',  # 项目的版本号
 	packages=find_packages(
 			exclude=["test", "*.tests", "*.tests.*", "tests.*", "tests", "example"]), # 自动发现所有包
 	url="https://github.com/nacos-group/nacos-maintainer-sdk-python.git",
