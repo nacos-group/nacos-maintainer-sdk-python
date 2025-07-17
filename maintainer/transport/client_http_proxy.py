@@ -69,7 +69,8 @@ class ClientHttpProxy:
 		resource = http_reqeust.request_resource
 		if self.ai_client_config.username and self.ai_client_config.password:
 			access_token = await self.auth_client.get_access_token(False)
-			headers[Constants.ACCESS_TOKEN] = access_token
+			if access_token is not None and access_token != "":
+				headers[Constants.ACCESS_TOKEN] = access_token
 
 		now = get_current_time_millis()
 		credentials = self.ai_client_config.credentials_provider.get_credentials()
