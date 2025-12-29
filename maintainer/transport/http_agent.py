@@ -1,8 +1,8 @@
+# -*- coding: utf-8 -*-
 from http import HTTPStatus
 from urllib.parse import urlencode
 import aiohttp
-
-from maintainer.common.nacos_exception import SERVER_ERROR, HTTP_CLIENT_ERROR_CODE
+from v2.nacos.common.nacos_exception import HTTP_CLIENT_ERROR_CODE
 
 HTTP_STATUS_SUCCESS = 200
 
@@ -14,24 +14,39 @@ class HttpAgent:
 
         self.ssl_context = None
 
-    async def request(self, url: str, method: str, headers: dict = None, params: dict = None, data: dict = None):
+    async def request(
+        self,
+        url: str,
+        method: str,
+        headers: dict = None,
+        params: dict = None,
+        data: dict = None,
+    ):
         if not headers:
             headers = {}
 
         if params:
-            url += '?' + urlencode(params)
+            url += "?" + urlencode(params)
 
         self.logger.debug(
-            f"[http-request] url: {url}, headers: {headers}, params: {params}, data: {data}, timeout: {self.default_timeout}")
+            f"[http-request] url: {url}, headers: {headers}, params: {params}, data: {data}, timeout: {self.default_timeout}",
+        )
 
         try:
             if not url.startswith("http"):
                 url = f"http://{url}"
 
             connector = aiohttp.TCPConnector()
-            async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=self.default_timeout),
-                                             connector=connector) as session:
-                async with session.request(method, url, headers=headers, data=data) as response:
+            async with aiohttp.ClientSession(
+                timeout=aiohttp.ClientTimeout(total=self.default_timeout),
+                connector=connector,
+            ) as session:
+                async with session.request(
+                    method,
+                    url,
+                    headers=headers,
+                    data=data,
+                ) as response:
                     if response.status == HTTPStatus.OK:
                         return await response.read(), 200, None
                     else:
