@@ -84,7 +84,12 @@ class ClientHttpProxy:
         if not self.server_list:
             raise NacosException(INVALID_SERVER_STATUS, "server list is empty")
         self.current_index = (self.current_index + 1) % len(self.server_list)
-        return self.server_list[self.current_index]
+        server = self.server_list[self.current_index]
+
+        if ':' not in server.split('//')[-1]:
+            server = f"{server}:8848"
+
+        return server
 
     async def request(self, http_reqeust: HttpRequest):
         end_time = get_current_time_millis() + self.ai_client_config.timeout_ms
