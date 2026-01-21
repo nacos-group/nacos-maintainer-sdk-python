@@ -33,7 +33,7 @@ class NacosAIMaintainerService(NacosMaintainerClient):
 
     @staticmethod
     async def create_mcp_service(client_config: ClientConfig):
-        return NacosAIMaintainerService.create_ai_service(client_config)
+        return await NacosAIMaintainerService.create_ai_service(client_config)
 
     @staticmethod
     async def create_ai_service(client_config: ClientConfig):
