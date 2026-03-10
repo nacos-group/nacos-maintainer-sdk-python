@@ -42,6 +42,7 @@ class HttpRequest:
         if data is None:
             data = {}
         self.data = data
+        self.form_data = None
 
 
 class ClientHttpProxy:
@@ -147,13 +148,26 @@ class ClientHttpProxy:
         while get_current_time_millis() < end_time and retry_count > 0:
             try:
                 url = self.get_next_server() + http_reqeust.path
-                resp, err_code, error_msg = await self.http_agent.request(
-                    url,
-                    http_reqeust.method,
-                    headers,
-                    http_reqeust.params,
-                    http_reqeust.data,
-                )
+                if http_reqeust.form_data is not None:
+                    resp, err_code, error_msg = (
+                        await self.http_agent.request(
+                            url,
+                            http_reqeust.method,
+                            headers,
+                            http_reqeust.params,
+                            http_reqeust.form_data,
+                        )
+                    )
+                else:
+                    resp, err_code, error_msg = (
+                        await self.http_agent.request(
+                            url,
+                            http_reqeust.method,
+                            headers,
+                            http_reqeust.params,
+                            http_reqeust.data,
+                        )
+                    )
                 if not resp or error_msg:
                     self.logger.error(f"request error: {error_msg}")
                     raise NacosException(err_code, error_msg)

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 
 from a2a.types import AgentCard
 from pydantic import TypeAdapter
@@ -14,6 +14,13 @@ from v2.nacos.ai.model.mcp.mcp import (
 from v2.nacos.common.constants import Constants
 
 from maintainer.ai.model.a2a import AgentVersionDetail, AgentCardVersionInfo
+from maintainer.ai.model.prompt import (
+    PromptMetaSummary,
+    PromptMetaInfo,
+    PromptVersionSummary,
+    PromptVersionInfo,
+)
+from maintainer.ai.model.skill import Skill, SkillBasicInfo
 from maintainer.common.auth import RequestResource
 from maintainer.nacos_maintainer_client import NacosMaintainerClient
 from maintainer.transport.client_http_proxy import ClientHttpProxy, HttpRequest
@@ -593,3 +600,549 @@ class NacosAIMaintainerService(NacosMaintainerClient):
             page_available,
             agent_card_version_info_list,
         )
+
+    # ========== Prompt Maintainer Service ==========
+
+    async def list_prompts(
+        self,
+        namespace_id: str,
+        prompt_key: str,
+        search: str,
+        biz_tags: Optional[str],
+        page_no: int,
+        page_size: int,
+    ) -> Tuple[int, int, int, List[PromptMetaSummary]]:
+        if namespace_id is None or len(namespace_id) == 0:
+            namespace_id = DEFAULT_NAMESPACE_ID
+
+        params = {
+            "namespaceId": namespace_id,
+            "promptKey": prompt_key,
+            "search": search,
+            "pageNo": page_no,
+            "pageSize": page_size,
+        }
+        if biz_tags is not None and len(biz_tags) > 0:
+            params["bizTags"] = biz_tags
+
+        request_resource = RequestResource(
+            Constants.AI_MODULE, namespace_id, "", prompt_key,
+        )
+        request = HttpRequest(
+            path="/nacos/v3/admin/ai/prompt/list",
+            method="GET",
+            request_resource=request_resource,
+            params=params,
+        )
+        result = await self.http_proxy.request(request)
+        if result["code"] != 0:
+            self.logger.error(f"list prompts failed, result:{result}")
+            raise Exception(result["message"])
+
+        result_data = result["data"]
+        total_count = result_data["totalCount"]
+        page_number = result_data["pageNumber"]
+        page_available = result_data["pagesAvailable"]
+        page_items = result_data["pageItems"]
+        adapter = TypeAdapter(List[PromptMetaSummary])
+        prompts = adapter.validate_python(page_items)
+        return total_count, page_number, page_available, prompts
+
+    async def search_prompts(
+        self,
+        namespace_id: str,
+        prompt_key: str,
+        page_no: int,
+        page_size: int,
+        biz_tags: Optional[str] = None,
+    ) -> Tuple[int, int, int, List[PromptMetaSummary]]:
+        return await self.list_prompts(
+            namespace_id, prompt_key, "blur", biz_tags, page_no, page_size,
+        )
+
+    async def get_prompt_meta(
+        self,
+        namespace_id: str,
+        prompt_key: str,
+    ) -> PromptMetaInfo:
+        if namespace_id is None or len(namespace_id) == 0:
+            namespace_id = DEFAULT_NAMESPACE_ID
+
+        params = {
+            "namespaceId": namespace_id,
+            "promptKey": prompt_key,
+        }
+        request_resource = RequestResource(
+            Constants.AI_MODULE, namespace_id, "", prompt_key,
+        )
+        request = HttpRequest(
+            path="/nacos/v3/admin/ai/prompt/metadata",
+            method="GET",
+            request_resource=request_resource,
+            params=params,
+        )
+        result = await self.http_proxy.request(request)
+        if result["code"] != 0:
+            self.logger.error(f"get prompt meta failed, result:{result}")
+            raise Exception(result["message"])
+
+        adapter = TypeAdapter(PromptMetaInfo)
+        return adapter.validate_python(result["data"])
+
+    async def query_prompt_detail(
+        self,
+        namespace_id: str,
+        prompt_key: str,
+        version: Optional[str] = None,
+        label: Optional[str] = None,
+    ) -> PromptVersionInfo:
+        if namespace_id is None or len(namespace_id) == 0:
+            namespace_id = DEFAULT_NAMESPACE_ID
+
+        params = {
+            "namespaceId": namespace_id,
+            "promptKey": prompt_key,
+        }
+        if version is not None and len(version) > 0:
+            params["version"] = version
+        if label is not None and len(label) > 0:
+            params["label"] = label
+
+        request_resource = RequestResource(
+            Constants.AI_MODULE, namespace_id, "", prompt_key,
+        )
+        request = HttpRequest(
+            path="/nacos/v3/admin/ai/prompt/detail",
+            method="GET",
+            request_resource=request_resource,
+            params=params,
+        )
+        result = await self.http_proxy.request(request)
+        if result["code"] != 0:
+            self.logger.error(
+                f"query prompt detail failed, result:{result}",
+            )
+            raise Exception(result["message"])
+
+        adapter = TypeAdapter(PromptVersionInfo)
+        return adapter.validate_python(result["data"])
+
+    async def publish_prompt(
+        self,
+        namespace_id: str,
+        prompt_key: str,
+        version: str,
+        template: str,
+        commit_msg: Optional[str] = None,
+        description: Optional[str] = None,
+        biz_tags: Optional[str] = None,
+    ) -> bool:
+        if namespace_id is None or len(namespace_id) == 0:
+            namespace_id = DEFAULT_NAMESPACE_ID
+
+        params = {
+            "namespaceId": namespace_id,
+            "promptKey": prompt_key,
+            "version": version,
+            "template": template,
+        }
+        if commit_msg is not None and len(commit_msg) > 0:
+            params["commitMsg"] = commit_msg
+        if description is not None and len(description) > 0:
+            params["description"] = description
+        if biz_tags is not None and len(biz_tags) > 0:
+            params["bizTags"] = biz_tags
+
+        request_resource = RequestResource(
+            Constants.AI_MODULE, namespace_id, "", prompt_key,
+        )
+        request = HttpRequest(
+            path="/nacos/v3/admin/ai/prompt",
+            method="POST",
+            request_resource=request_resource,
+            data=params,
+        )
+        result = await self.http_proxy.request(request)
+        if result["code"] != 0:
+            self.logger.error(f"publish prompt failed, result:{result}")
+            return False
+
+        return True
+
+    async def delete_prompt(
+        self,
+        namespace_id: str,
+        prompt_key: str,
+    ) -> bool:
+        if namespace_id is None or len(namespace_id) == 0:
+            namespace_id = DEFAULT_NAMESPACE_ID
+
+        params = {
+            "namespaceId": namespace_id,
+            "promptKey": prompt_key,
+        }
+        request_resource = RequestResource(
+            Constants.AI_MODULE, namespace_id, "", prompt_key,
+        )
+        request = HttpRequest(
+            path="/nacos/v3/admin/ai/prompt",
+            method="DELETE",
+            request_resource=request_resource,
+            params=params,
+        )
+        result = await self.http_proxy.request(request)
+        if result["code"] != 0:
+            self.logger.error(f"delete prompt failed, result:{result}")
+            return False
+
+        return True
+
+    async def list_prompt_versions(
+        self,
+        namespace_id: str,
+        prompt_key: str,
+        page_no: int,
+        page_size: int,
+    ) -> Tuple[int, int, int, List[PromptVersionSummary]]:
+        if namespace_id is None or len(namespace_id) == 0:
+            namespace_id = DEFAULT_NAMESPACE_ID
+
+        params = {
+            "namespaceId": namespace_id,
+            "promptKey": prompt_key,
+            "pageNo": page_no,
+            "pageSize": page_size,
+        }
+        request_resource = RequestResource(
+            Constants.AI_MODULE, namespace_id, "", prompt_key,
+        )
+        request = HttpRequest(
+            path="/nacos/v3/admin/ai/prompt/versions",
+            method="GET",
+            request_resource=request_resource,
+            params=params,
+        )
+        result = await self.http_proxy.request(request)
+        if result["code"] != 0:
+            self.logger.error(
+                f"list prompt versions failed, result:{result}",
+            )
+            raise Exception(result["message"])
+
+        result_data = result["data"]
+        total_count = result_data["totalCount"]
+        page_number = result_data["pageNumber"]
+        page_available = result_data["pagesAvailable"]
+        page_items = result_data["pageItems"]
+        adapter = TypeAdapter(List[PromptVersionSummary])
+        versions = adapter.validate_python(page_items)
+        return total_count, page_number, page_available, versions
+
+    async def update_prompt_metadata(
+        self,
+        namespace_id: str,
+        prompt_key: str,
+        description: Optional[str] = None,
+        biz_tags: Optional[str] = None,
+    ) -> bool:
+        if namespace_id is None or len(namespace_id) == 0:
+            namespace_id = DEFAULT_NAMESPACE_ID
+
+        params = {
+            "namespaceId": namespace_id,
+            "promptKey": prompt_key,
+        }
+        if description is not None:
+            params["description"] = description
+        if biz_tags is not None:
+            params["bizTags"] = biz_tags
+
+        request_resource = RequestResource(
+            Constants.AI_MODULE, namespace_id, "", prompt_key,
+        )
+        request = HttpRequest(
+            path="/nacos/v3/admin/ai/prompt/metadata",
+            method="PUT",
+            request_resource=request_resource,
+            data=params,
+        )
+        result = await self.http_proxy.request(request)
+        if result["code"] != 0:
+            self.logger.error(
+                f"update prompt metadata failed, result:{result}",
+            )
+            return False
+
+        return True
+
+    async def bind_label(
+        self,
+        namespace_id: str,
+        prompt_key: str,
+        label: str,
+        version: str,
+    ) -> bool:
+        if namespace_id is None or len(namespace_id) == 0:
+            namespace_id = DEFAULT_NAMESPACE_ID
+
+        params = {
+            "namespaceId": namespace_id,
+            "promptKey": prompt_key,
+            "label": label,
+            "version": version,
+        }
+        request_resource = RequestResource(
+            Constants.AI_MODULE, namespace_id, "", prompt_key,
+        )
+        request = HttpRequest(
+            path="/nacos/v3/admin/ai/prompt/label",
+            method="PUT",
+            request_resource=request_resource,
+            data=params,
+        )
+        result = await self.http_proxy.request(request)
+        if result["code"] != 0:
+            self.logger.error(f"bind label failed, result:{result}")
+            return False
+
+        return True
+
+    async def unbind_label(
+        self,
+        namespace_id: str,
+        prompt_key: str,
+        label: str,
+    ) -> bool:
+        if namespace_id is None or len(namespace_id) == 0:
+            namespace_id = DEFAULT_NAMESPACE_ID
+
+        params = {
+            "namespaceId": namespace_id,
+            "promptKey": prompt_key,
+            "label": label,
+        }
+        request_resource = RequestResource(
+            Constants.AI_MODULE, namespace_id, "", prompt_key,
+        )
+        request = HttpRequest(
+            path="/nacos/v3/admin/ai/prompt/label",
+            method="DELETE",
+            request_resource=request_resource,
+            params=params,
+        )
+        result = await self.http_proxy.request(request)
+        if result["code"] != 0:
+            self.logger.error(f"unbind label failed, result:{result}")
+            return False
+
+        return True
+
+    # ========== Skill Maintainer Service ==========
+
+    async def register_skill(
+        self,
+        namespace_id: str,
+        skill: Skill,
+    ) -> str:
+        if namespace_id is None or len(namespace_id) == 0:
+            namespace_id = DEFAULT_NAMESPACE_ID
+
+        params = {
+            "namespaceId": namespace_id,
+            "skillCard": skill.model_dump_json(
+                exclude_none=True, by_alias=True,
+            ),
+        }
+        request_resource = RequestResource(
+            Constants.AI_MODULE, namespace_id, "", skill.name,
+        )
+        request = HttpRequest(
+            path="/nacos/v3/admin/ai/skills",
+            method="POST",
+            request_resource=request_resource,
+            data=params,
+        )
+        result = await self.http_proxy.request(request)
+        if result["code"] != 0:
+            self.logger.error(f"register skill failed, result:{result}")
+            raise Exception(result["message"])
+
+        return result["data"]
+
+    async def get_skill_detail(
+        self,
+        namespace_id: str,
+        skill_name: str,
+    ) -> Skill:
+        if namespace_id is None or len(namespace_id) == 0:
+            namespace_id = DEFAULT_NAMESPACE_ID
+
+        params = {
+            "namespaceId": namespace_id,
+            "skillName": skill_name,
+        }
+        request_resource = RequestResource(
+            Constants.AI_MODULE, namespace_id, "", skill_name,
+        )
+        request = HttpRequest(
+            path="/nacos/v3/admin/ai/skills",
+            method="GET",
+            request_resource=request_resource,
+            params=params,
+        )
+        result = await self.http_proxy.request(request)
+        if result["code"] != 0:
+            self.logger.error(
+                f"get skill detail failed, result:{result}",
+            )
+            raise Exception(result["message"])
+
+        adapter = TypeAdapter(Skill)
+        return adapter.validate_python(result["data"])
+
+    async def update_skill(
+        self,
+        namespace_id: str,
+        skill: Skill,
+    ) -> bool:
+        if namespace_id is None or len(namespace_id) == 0:
+            namespace_id = DEFAULT_NAMESPACE_ID
+
+        params = {
+            "namespaceId": namespace_id,
+            "skillCard": skill.model_dump_json(
+                exclude_none=True, by_alias=True,
+            ),
+        }
+        request_resource = RequestResource(
+            Constants.AI_MODULE, namespace_id, "", skill.name,
+        )
+        request = HttpRequest(
+            path="/nacos/v3/admin/ai/skills",
+            method="PUT",
+            request_resource=request_resource,
+            data=params,
+        )
+        result = await self.http_proxy.request(request)
+        if result["code"] != 0:
+            self.logger.error(f"update skill failed, result:{result}")
+            return False
+
+        return True
+
+    async def delete_skill(
+        self,
+        namespace_id: str,
+        skill_name: str,
+    ) -> bool:
+        if namespace_id is None or len(namespace_id) == 0:
+            namespace_id = DEFAULT_NAMESPACE_ID
+
+        params = {
+            "namespaceId": namespace_id,
+            "skillName": skill_name,
+        }
+        request_resource = RequestResource(
+            Constants.AI_MODULE, namespace_id, "", skill_name,
+        )
+        request = HttpRequest(
+            path="/nacos/v3/admin/ai/skills",
+            method="DELETE",
+            request_resource=request_resource,
+            params=params,
+        )
+        result = await self.http_proxy.request(request)
+        if result["code"] != 0:
+            self.logger.error(f"delete skill failed, result:{result}")
+            return False
+
+        return True
+
+    async def list_skills(
+        self,
+        namespace_id: str,
+        skill_name: str,
+        search: str,
+        page_no: int,
+        page_size: int,
+    ) -> Tuple[int, int, int, List[SkillBasicInfo]]:
+        if namespace_id is None or len(namespace_id) == 0:
+            namespace_id = DEFAULT_NAMESPACE_ID
+
+        params = {
+            "namespaceId": namespace_id,
+            "skillName": skill_name,
+            "search": search,
+            "pageNo": page_no,
+            "pageSize": page_size,
+        }
+        request_resource = RequestResource(
+            Constants.AI_MODULE, namespace_id, "", skill_name,
+        )
+        request = HttpRequest(
+            path="/nacos/v3/admin/ai/skills/list",
+            method="GET",
+            request_resource=request_resource,
+            params=params,
+        )
+        result = await self.http_proxy.request(request)
+        if result["code"] != 0:
+            self.logger.error(f"list skills failed, result:{result}")
+            raise Exception(result["message"])
+
+        result_data = result["data"]
+        total_count = result_data["totalCount"]
+        page_number = result_data["pageNumber"]
+        page_available = result_data["pagesAvailable"]
+        page_items = result_data["pageItems"]
+        adapter = TypeAdapter(List[SkillBasicInfo])
+        skills = adapter.validate_python(page_items)
+        return total_count, page_number, page_available, skills
+
+    async def search_skills(
+        self,
+        namespace_id: str,
+        skill_name: str,
+        page_no: int,
+        page_size: int,
+    ) -> Tuple[int, int, int, List[SkillBasicInfo]]:
+        return await self.list_skills(
+            namespace_id, skill_name, "blur", page_no, page_size,
+        )
+
+    async def upload_skill_from_zip(
+        self,
+        namespace_id: str,
+        zip_bytes: bytes,
+    ) -> str:
+        if namespace_id is None or len(namespace_id) == 0:
+            namespace_id = DEFAULT_NAMESPACE_ID
+
+        import aiohttp
+
+        form_data = aiohttp.FormData()
+        form_data.add_field("namespaceId", namespace_id)
+        form_data.add_field(
+            "file",
+            zip_bytes,
+            filename="skill.zip",
+            content_type="application/zip",
+        )
+
+        request_resource = RequestResource(
+            Constants.AI_MODULE, namespace_id, "", None,
+        )
+        request = HttpRequest(
+            path="/nacos/v3/admin/ai/skills/upload",
+            method="POST",
+            request_resource=request_resource,
+        )
+        request.form_data = form_data
+        result = await self.http_proxy.request(request)
+        if result["code"] != 0:
+            self.logger.error(
+                f"upload skill from zip failed, result:{result}",
+            )
+            raise Exception(result["message"])
+
+        return result["data"]
